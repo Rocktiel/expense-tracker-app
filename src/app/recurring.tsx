@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { CategoryIcon } from '@/components/ExpenseRow';
 import { AmountInput, Button, Card, Chip, EmptyState, FieldLabel, IconButton, InfoBanner, Input, Screen, SectionTitle } from '@/components/ui';
+import { accountName } from '@/lib/accounts';
 import { CATEGORY_LIST, type CategoryId } from '@/lib/categories';
 import { formatMoney, monthLabel, monthKey, parseAmount } from '@/lib/format';
 import { RepeatMonthsPicker } from '@/components/RepeatMonthsPicker';
@@ -14,12 +15,15 @@ import { useAppStore } from '@/store/useAppStore';
 
 function AddForm({ onDone }: { onDone: () => void }) {
   const addRecurring = useAppStore((s) => s.addRecurring);
+  const accounts = useAppStore((s) => s.accounts);
+  const defaultAccountId = useAppStore((s) => s.defaultAccountId);
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<CategoryId>('fatura');
   const [day, setDay] = useState(() => new Date().getDate());
   const [months, setMonths] = useState<number | null>(null);
   const [startMonth] = useState(() => monthKey(Date.now()));
+  const [accountId, setAccountId] = useState<string | undefined>(defaultAccountId ?? accounts[0]?.id);
 
   const save = () => {
     const value = parseAmount(amount);
@@ -32,6 +36,7 @@ function AddForm({ onDone }: { onDone: () => void }) {
       dayOfMonth: day,
       startMonth,
       totalMonths: months ?? undefined,
+      accountId,
     });
     onDone();
   };
@@ -63,6 +68,24 @@ function AddForm({ onDone }: { onDone: () => void }) {
         <IconButton icon="add" label="Artır" onPress={() => setDay((d) => (d >= 31 ? 1 : d + 1))} />
       </View>
 
+      {accounts.length ? (
+        <>
+          <FieldLabel>Hangi hesaptan ödeniyor? (isteğe bağlı)</FieldLabel>
+          <View className="mb-5 flex-row flex-wrap">
+            <Chip label="Hesapsız" selected={!accountId} onPress={() => setAccountId(undefined)} />
+            {accounts.map((a) => (
+              <Chip
+                key={a.id}
+                label={a.name}
+                icon="wallet-outline"
+                selected={accountId === a.id}
+                onPress={() => setAccountId(accountId === a.id ? undefined : a.id)}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
+
       <RepeatMonthsPicker value={months} onChange={setMonths} startMonth={startMonth} amount={parseAmount(amount)} />
       {months !== null ? (
         <Text className="mt-2 text-sm leading-5 text-faint">
@@ -91,6 +114,8 @@ function PaymentRow({
   onDelete: () => void;
 }) {
   const { item, paid, daysLeft, status, installment } = entry;
+  const accounts = useAppStore((s) => s.accounts);
+  const acc = accountName(accounts, item.accountId);
   const end = recurringEndMonth(item);
   const detail =
     status === 'finished'
@@ -111,6 +136,7 @@ function PaymentRow({
           </Text>
           <Text className="text-sm text-muted">
             {formatMoney(item.amount)} · her ayın {item.dayOfMonth}. günü
+            {acc ? ` · ${acc}` : ''}
           </Text>
           <View className="mt-0.5 flex-row items-center">
             <Ionicons name={item.totalMonths ? 'calendar-outline' : 'infinite'} size={14} color={COLORS.muted} />
@@ -161,6 +187,7 @@ function PaymentRow({
 
 export default function Recurring() {
   const recurring = useAppStore((s) => s.recurring);
+  const accounts = useAppStore((s) => s.accounts);
   const markPaid = useAppStore((s) => s.markRecurringPaid);
   const undoPaid = useAppStore((s) => s.undoRecurringPaid);
   const deleteRecurring = useAppStore((s) => s.deleteRecurring);
@@ -180,11 +207,17 @@ export default function Recurring() {
       { text: 'Sil', style: 'destructive', onPress: () => deleteRecurring(id) },
     ]);
 
-  const confirmPaid = (id: string, title: string, amount: number) =>
-    Alert.alert('Ödendi mi?', `${title} (${formatMoney(amount)}) bu ayın giderlerine eklenecek.`, [
-      { text: 'Vazgeç', style: 'cancel' },
-      { text: 'Evet, ödendi', onPress: () => markPaid(id) },
-    ]);
+  const confirmPaid = (id: string, title: string, amount: number, accountId?: string) =>
+    Alert.alert(
+      'Ödendi mi?',
+      `${title} (${formatMoney(amount)}) bu ayın giderlerine eklenecek.${
+        accountId && accountName(accounts, accountId) ? ` ${accountName(accounts, accountId)} hesabından düşülecek.` : ''
+      }`,
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        { text: 'Evet, ödendi', onPress: () => markPaid(id) },
+      ],
+    );
 
   const confirmUndo = (id: string, title: string) =>
     Alert.alert('Geri alınsın mı?', `${title} için bu ay eklenen gider silinecek.`, [
@@ -228,7 +261,7 @@ export default function Recurring() {
                 <PaymentRow
                   key={u.item.id}
                   entry={u}
-                  onPaid={() => confirmPaid(u.item.id, u.item.title, u.item.amount)}
+                  onPaid={() => confirmPaid(u.item.id, u.item.title, u.item.amount, u.item.accountId)}
                   onUndo={() => confirmUndo(u.item.id, u.item.title)}
                   onDelete={() => confirmDelete(u.item.id, u.item.title)}
                 />

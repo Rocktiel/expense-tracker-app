@@ -83,8 +83,11 @@ export default function Review() {
   const clear = useScanStore((s) => s.clear);
   const expenses = useAppStore((s) => s.expenses);
   const addExpenses = useAppStore((s) => s.addExpenses);
+  const accounts = useAppStore((s) => s.accounts);
+  const defaultAccountId = useAppStore((s) => s.defaultAccountId);
 
   const [saving, setSaving] = useState(false);
+  const [accountId, setAccountId] = useState<string | undefined>(defaultAccountId ?? accounts[0]?.id);
   const [drafts, setDrafts] = useState<Draft[]>(() =>
     receipts.map((r) => ({
       include: true,
@@ -142,6 +145,7 @@ export default function Review() {
           date: d.date,
           category: d.category,
           paymentMethod: d.paymentMethod,
+          accountId,
           note: d.note?.trim() || undefined,
           items: d.items.length ? d.items : undefined,
           attachments: attachments.length ? attachments : undefined,
@@ -209,6 +213,24 @@ export default function Review() {
             ? `${drafts.length} fiş bulundu. Bilgileri kontrol edip kaydedin.`
             : 'Fiş okundu. Bilgileri kontrol edip kaydedin.'}
         </InfoBanner>
+
+        {accounts.length ? (
+          <>
+            <FieldLabel>Hangi hesaptan ödendi?</FieldLabel>
+            <View className="mb-4 flex-row flex-wrap">
+              <Chip label="Hesapsız" selected={!accountId} onPress={() => setAccountId(undefined)} />
+              {accounts.map((a) => (
+                <Chip
+                  key={a.id}
+                  label={a.name}
+                  icon="wallet-outline"
+                  selected={accountId === a.id}
+                  onPress={() => setAccountId(accountId === a.id ? undefined : a.id)}
+                />
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {drafts.map((d, index) => {
           const amount = parseAmount(d.amountText);

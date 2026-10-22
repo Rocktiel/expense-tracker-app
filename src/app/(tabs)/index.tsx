@@ -1,10 +1,11 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { ExpenseRow, CategoryIcon } from '@/components/ExpenseRow';
 import { BigAction, Card, EmptyState, ProgressBar, Screen, SectionTitle } from '@/components/ui';
+import { accountKindInfo, accountName, accountSummaries, totalBalance } from '@/lib/accounts';
 import { formatDate, formatMoney, greeting, monthKey, monthLabel, shiftMonth } from '@/lib/format';
 import { expensesInMonth, sumAmounts, upcomingPayments } from '@/lib/stats';
 import { COLORS } from '@/lib/theme';
@@ -17,6 +18,10 @@ export default function Home() {
   const recurring = useAppStore((s) => s.recurring);
   const budget = useAppStore((s) => s.monthlyBudget);
   const markPaid = useAppStore((s) => s.markRecurringPaid);
+  const accounts = useAppStore((s) => s.accounts);
+  const incomes = useAppStore((s) => s.incomes);
+  const transfers = useAppStore((s) => s.transfers);
+  const defaultAccountId = useAppStore((s) => s.defaultAccountId);
 
   const now = useNow();
   const current = monthKey(now);
@@ -27,6 +32,12 @@ export default function Home() {
     const todayTotal = sumAmounts(expenses.filter((e) => new Date(e.date).toDateString() === today));
     return { thisMonth, lastMonth, todayTotal };
   }, [expenses, current, now]);
+
+  const balances = useMemo(
+    () => accountSummaries(accounts, expenses, incomes, transfers, current),
+    [accounts, expenses, incomes, transfers, current],
+  );
+  const total = useMemo(() => totalBalance(accounts, expenses, incomes, transfers), [accounts, expenses, incomes, transfers]);
 
   const upcoming = useMemo(
     () => upcomingPayments(recurring, new Date(now))
@@ -48,6 +59,79 @@ export default function Home() {
           {greeting()}, {userName} 👋
         </Text>
       </View>
+
+      {accounts.length ? (
+        <Pressable
+          onPress={() => router.push('/accounts')}
+          accessibilityRole="button"
+          accessibilityLabel={`Toplam bakiye ${formatMoney(total)}`}
+          className="mb-4 rounded-3xl border border-primary/40 bg-primary/10 p-5 active:opacity-80"
+        >
+          <View className="flex-row items-start justify-between">
+            <View className="flex-1">
+              <Text className="text-base font-semibold text-muted">Toplam bakiye</Text>
+              <Text
+                className={`mt-1 text-4xl font-bold ${total < 0 ? 'text-danger' : 'text-ink'}`}
+                adjustsFontSizeToFit
+                numberOfLines={1}
+              >
+                {formatMoney(total)}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: '/income/new',
+                  params: { accountId: defaultAccountId ?? accounts[0].id },
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Gelir ekle"
+              className="ml-2 min-h-[40px] flex-row items-center rounded-full bg-primary px-3 active:opacity-70"
+            >
+              <Ionicons name="add" size={18} color={COLORS.onprimary} />
+              <Text className="ml-0.5 text-sm font-bold text-onprimary">Gelir</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-1 mt-3">
+            {balances.map(({ account, balance }) => {
+              const info = accountKindInfo(account.kind);
+              return (
+                <View key={account.id} className="mx-1 flex-row items-center rounded-full bg-surface/80 px-3 py-1.5">
+                  <Ionicons name={info.icon} size={14} color={info.color} />
+                  <Text className="ml-1.5 text-sm text-muted" numberOfLines={1}>
+                    {account.name}
+                  </Text>
+                  <Text className={`ml-1.5 text-sm font-bold ${balance < 0 ? 'text-danger' : 'text-ink'}`}>
+                    {formatMoney(balance, { decimals: false })}
+                  </Text>
+                </View>
+              );
+            })}
+            <View className="mx-1 flex-row items-center rounded-full border border-dashed border-line px-3 py-1.5">
+              <Ionicons name="chevron-forward" size={14} color={COLORS.muted} />
+              <Text className="ml-1 text-sm font-semibold text-muted">Hesaplar</Text>
+            </View>
+          </ScrollView>
+        </Pressable>
+      ) : (
+        <Pressable
+          onPress={() => router.push('/account/new')}
+          className="mb-4 flex-row items-center rounded-3xl border border-dashed border-line p-4 active:opacity-70"
+        >
+          <View className="h-11 w-11 items-center justify-center rounded-2xl bg-primary/15">
+            <Ionicons name="wallet-outline" size={22} color={COLORS.primary} />
+          </View>
+          <View className="ml-3 flex-1">
+            <Text className="text-base font-bold text-ink">Bakiyenizi takip edin</Text>
+            <Text className="mt-0.5 text-sm leading-5 text-muted">
+              Garanti, Ziraat, nakit... Hesap ekleyin; giderler bakiyeden düşsün, maaş gelince ekleyin.
+            </Text>
+          </View>
+          <Ionicons name="add-circle" size={26} color={COLORS.primary} />
+        </Pressable>
+      )}
 
       <Card className="mb-4 p-5">
         <Text className="text-base font-semibold text-muted">{monthLabel(current, false)} ayında harcanan</Text>
@@ -111,10 +195,18 @@ export default function Home() {
                 </View>
                 <Pressable
                   onPress={() =>
-                    Alert.alert('Ödendi mi?', `${item.title} (${formatMoney(item.amount)}) bu ayın giderlerine eklenecek.`, [
-                      { text: 'Vazgeç', style: 'cancel' },
-                      { text: 'Evet, ödendi', onPress: () => markPaid(item.id) },
-                    ])
+                    Alert.alert(
+                      'Ödendi mi?',
+                      `${item.title} (${formatMoney(item.amount)}) bu ayın giderlerine eklenecek.${
+                        accountName(accounts, item.accountId)
+                          ? ` ${accountName(accounts, item.accountId)} hesabından düşülecek.`
+                          : ''
+                      }`,
+                      [
+                        { text: 'Vazgeç', style: 'cancel' },
+                        { text: 'Evet, ödendi', onPress: () => markPaid(item.id) },
+                      ],
+                    )
                   }
                   accessibilityRole="button"
                   accessibilityLabel={`${item.title} ödendi`}

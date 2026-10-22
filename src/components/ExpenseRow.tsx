@@ -3,9 +3,11 @@ import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { getCategory } from '@/lib/categories';
+import { accountName } from '@/lib/accounts';
 import { formatMoney, formatRelativeDay, formatTime } from '@/lib/format';
 import { COLORS } from '@/lib/theme';
 import type { Expense } from '@/lib/types';
+import { useAppStore } from '@/store/useAppStore';
 
 export function CategoryIcon({ category, size = 48 }: { category: string; size?: number }) {
   const c = getCategory(category);
@@ -29,7 +31,11 @@ function ExpenseRowBase({
   showDay?: boolean;
 }) {
   const c = getCategory(expense.category);
-  const meta = [showDay ? formatRelativeDay(expense.date) : formatTime(expense.date), c.label].join(' · ');
+  const accounts = useAppStore((s) => s.accounts);
+  const account = accountName(accounts, expense.accountId);
+  const meta = [showDay ? formatRelativeDay(expense.date) : formatTime(expense.date), c.label, account]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <Pressable
       onPress={onPress}

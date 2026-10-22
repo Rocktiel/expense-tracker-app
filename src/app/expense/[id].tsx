@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CategoryIcon } from '@/components/ExpenseRow';
 import { Button, Card, EmptyState, Screen, SectionTitle } from '@/components/ui';
 import { getCategory } from '@/lib/categories';
+import { accountName } from '@/lib/accounts';
 import { shareFile } from '@/lib/exportData';
 import { attachmentUri, isPdf } from '@/lib/files';
 import { formatDate, formatMoney, formatTime, paymentLabel } from '@/lib/format';
@@ -28,6 +29,7 @@ export default function ExpenseDetail() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const expense = useAppStore((s) => s.expenses.find((e) => e.id === id));
+  const accounts = useAppStore((s) => s.accounts);
   const deleteExpense = useAppStore((s) => s.deleteExpense);
   const [viewer, setViewer] = useState<{ uri: string; aspect: number } | null>(null);
 
@@ -110,6 +112,9 @@ export default function ExpenseDetail() {
             </Text>
           </View>
           {expense.paymentMethod ? <InfoLine label="Ödeme" value={paymentLabel(expense.paymentMethod) ?? ''} /> : null}
+          {accountName(accounts, expense.accountId) ? (
+            <InfoLine label="Hesap" value={accountName(accounts, expense.accountId) ?? ''} />
+          ) : null}
           <InfoLine label="Kaynak" value={SOURCE_LABEL[expense.source] ?? 'Elle eklendi'} />
           {expense.note ? <InfoLine label="Not" value={expense.note} /> : null}
         </Card>

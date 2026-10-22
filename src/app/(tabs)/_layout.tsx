@@ -40,6 +40,10 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Ana Sayfa', tabBarIcon: tabIcon('home', 'home-outline') }} />
       <Tabs.Screen name="expenses" options={{ title: 'Giderler', tabBarIcon: tabIcon('list', 'list-outline') }} />
       <Tabs.Screen
+        name="accounts"
+        options={{ title: 'Hesaplar', tabBarIcon: tabIcon('wallet', 'wallet-outline') }}
+      />
+      <Tabs.Screen
         name="reports"
         options={{ title: 'Raporlar', tabBarIcon: tabIcon('pie-chart', 'pie-chart-outline') }}
       />

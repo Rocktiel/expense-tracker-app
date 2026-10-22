@@ -3,7 +3,8 @@ import { useMemo, useState } from 'react';
 import { Alert, Pressable, Switch, Text, View } from 'react-native';
 
 import type { CategoryId } from '@/lib/categories';
-import { amountToInput, monthKey, normalizeSearch, parseAmount, PAYMENT_METHODS } from '@/lib/format';
+import { accountBalance } from '@/lib/accounts';
+import { amountToInput, formatMoney, monthKey, normalizeSearch, parseAmount, PAYMENT_METHODS } from '@/lib/format';
 import { COLORS } from '@/lib/theme';
 import type { PaymentMethod } from '@/lib/types';
 import { useAppStore } from '@/store/useAppStore';
@@ -19,6 +20,7 @@ export interface ExpenseFormValues {
   date: number;
   category: CategoryId;
   paymentMethod?: PaymentMethod;
+  accountId?: string;
   note?: string;
 }
 
@@ -33,16 +35,29 @@ interface Props {
 
 export function ExpenseForm({ title: screenTitle, initial, submitLabel, allowRepeat = false, onSubmit }: Props) {
   const expenses = useAppStore((s) => s.expenses);
+  const accounts = useAppStore((s) => s.accounts);
+  const incomes = useAppStore((s) => s.incomes);
+  const transfers = useAppStore((s) => s.transfers);
+  const defaultAccountId = useAppStore((s) => s.defaultAccountId);
 
   const [amount, setAmount] = useState(initial?.amount ? amountToInput(initial.amount) : '');
   const [title, setTitle] = useState(initial?.title ?? '');
   const [category, setCategory] = useState<CategoryId>(initial?.category ?? 'market');
   const [date, setDate] = useState(() => initial?.date ?? Date.now());
   const [payment, setPayment] = useState<PaymentMethod | undefined>(initial?.paymentMethod);
+  // Yeni kayıtta son kullanılan hesap ön seçili gelir; düzenlemede kaydın hesabı korunur
+  const [accountId, setAccountId] = useState<string | undefined>(
+    initial ? initial.accountId : defaultAccountId,
+  );
   const [note, setNote] = useState(initial?.note ?? '');
   const [repeat, setRepeat] = useState(false);
   const [repeatMonths, setRepeatMonths] = useState<number | null>(null);
   const [showNote, setShowNote] = useState(Boolean(initial?.note));
+
+  const accountBalances = useMemo(
+    () => new Map(accounts.map((a) => [a.id, accountBalance(a, expenses, incomes, transfers)])),
+    [accounts, expenses, incomes, transfers],
+  );
 
   /** Daha önce girilen başlıklardan öneriler; seçilince kategorisi de gelir */
   const suggestions = useMemo(() => {
@@ -77,6 +92,7 @@ export function ExpenseForm({ title: screenTitle, initial, submitLabel, allowRep
         date,
         category,
         paymentMethod: payment,
+        accountId,
         note: note.trim() || undefined,
       },
       { repeat: allowRepeat && repeat ? { totalMonths: repeatMonths } : null },
@@ -129,6 +145,27 @@ export function ExpenseForm({ title: screenTitle, initial, submitLabel, allowRep
           />
         ))}
       </View>
+
+      <FieldLabel>Hangi hesaptan ödendi? (isteğe bağlı)</FieldLabel>
+      {accounts.length ? (
+        <View className="mb-4 flex-row flex-wrap">
+          <Chip label="Hesapsız" selected={!accountId} onPress={() => setAccountId(undefined)} />
+          {accounts.map((a) => (
+            <Chip
+              key={a.id}
+              label={`${a.name} · ${formatMoney(accountBalances.get(a.id) ?? 0, { decimals: false })}`}
+              icon="wallet-outline"
+              selected={accountId === a.id}
+              onPress={() => setAccountId(accountId === a.id ? undefined : a.id)}
+            />
+          ))}
+        </View>
+      ) : (
+        <Text className="mb-5 text-sm leading-5 text-muted">
+          Hesap eklediğinizde harcamanın hangi banka/nakit hesabından düştüğünü seçebilir ve bakiyenizi ana sayfada
+          görebilirsiniz.
+        </Text>
+      )}
 
       {showNote ? (
         <Input

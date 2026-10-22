@@ -21,6 +21,7 @@ export default function Settings() {
   const model = useAppStore((s) => s.geminiModel);
   const setModel = useAppStore((s) => s.setGeminiModel);
   const expenses = useAppStore((s) => s.expenses);
+  const accounts = useAppStore((s) => s.accounts);
   const recurringCount = useAppStore((s) => s.recurring.length);
   const exportBackup = useAppStore((s) => s.exportBackup);
   const importBackup = useAppStore((s) => s.importBackup);
@@ -91,7 +92,7 @@ export default function Settings() {
       return;
     }
     try {
-      await shareCsv(expenses);
+      await shareCsv(expenses, accounts);
     } catch (e) {
       Alert.alert('Hata', e instanceof Error ? e.message : 'Dosya paylaşılamadı.');
     }
@@ -124,7 +125,7 @@ export default function Settings() {
       }
       Alert.alert(
         'Yedek geri yüklensin mi?',
-        `${data.expenses.length} harcama ve ${data.recurring.length} düzenli ödeme yüklenecek. Şu anki verilerin yerini alacak.`,
+        `${data.expenses.length} harcama, ${data.accounts?.length ?? 0} hesap ve ${data.recurring.length} düzenli ödeme yüklenecek. Şu anki verilerin yerini alacak.`,
         [
           { text: 'Vazgeç', style: 'cancel' },
           {
@@ -149,7 +150,7 @@ export default function Settings() {
     );
 
   const wipe = () => {
-    Alert.alert('Tüm veriler silinsin mi?', 'Bütün harcamalar, fiş fotoğrafları ve düzenli ödemeler silinecek (API anahtarı korunur). Bu işlem geri alınamaz.', [
+    Alert.alert('Tüm veriler silinsin mi?', 'Bütün harcamalar, hesaplar, gelirler, fiş fotoğrafları ve düzenli ödemeler silinecek (API anahtarı korunur). Bu işlem geri alınamaz.', [
       { text: 'Vazgeç', style: 'cancel' },
       {
         text: 'Evet, hepsini sil',
@@ -265,6 +266,16 @@ export default function Settings() {
           autoCapitalize="none"
           autoCorrect={false}
           className="mb-0 mt-2"
+        />
+      </Card>
+
+      <SectionTitle title="Hesaplar" />
+      <Card className="py-1">
+        <Row
+          icon="wallet"
+          title="Banka, nakit, kart hesapları"
+          value={accounts.length ? `${accounts.length} hesap` : undefined}
+          onPress={() => router.push('/accounts')}
         />
       </Card>
 

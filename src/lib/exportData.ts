@@ -3,7 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { getCategory } from './categories';
 import { writeTempFile } from './files';
 import { formatDate, formatTime, paymentLabel } from './format';
-import type { Expense } from './types';
+import type { Account, Expense } from './types';
 
 function csvCell(value: string): string {
   if (/[;"\n\r]/.test(value)) return `"${value.replace(/"/g, '""')}"`;
@@ -11,8 +11,9 @@ function csvCell(value: string): string {
 }
 
 /** Türkçe Excel ondalık için virgül kullandığından ayraç olarak ";" kullanılır. */
-export function buildCsv(expenses: Expense[]): string {
-  const header = ['Tarih', 'Saat', 'Başlık', 'Kategori', 'Tutar (TL)', 'Ödeme', 'Not', 'Kalemler'];
+export function buildCsv(expenses: Expense[], accounts: Account[] = []): string {
+  const header = ['Tarih', 'Saat', 'Başlık', 'Kategori', 'Tutar (TL)', 'Ödeme', 'Hesap', 'Not', 'Kalemler'];
+  const names = new Map(accounts.map((a) => [a.id, a.name]));
   const rows = expenses.map((e) => [
     formatDate(e.date),
     formatTime(e.date),
@@ -20,6 +21,7 @@ export function buildCsv(expenses: Expense[]): string {
     getCategory(e.category).label,
     e.amount.toFixed(2).replace('.', ','),
     paymentLabel(e.paymentMethod) ?? '',
+    e.accountId ? (names.get(e.accountId) ?? '') : '',
     e.note ?? '',
     (e.items ?? []).map((i) => `${i.name} (${i.price.toFixed(2).replace('.', ',')})`).join(', '),
   ]);
@@ -33,10 +35,10 @@ export async function shareFile(uri: string, mimeType: string, dialogTitle: stri
   await Sharing.shareAsync(uri, { mimeType, dialogTitle });
 }
 
-export async function shareCsv(expenses: Expense[]): Promise<void> {
+export async function shareCsv(expenses: Expense[], accounts: Account[] = []): Promise<void> {
   const date = new Date();
   const name = `giderler-${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}.csv`;
-  const uri = writeTempFile(name, buildCsv(expenses));
+  const uri = writeTempFile(name, buildCsv(expenses, accounts));
   await shareFile(uri, 'text/csv', 'Giderleri paylaş');
 }
 

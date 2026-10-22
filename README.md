@@ -13,6 +13,10 @@ Kişisel gider takip uygulaması. Fişin fotoğrafını çekin, Gemini yapay zek
   - Kaydetmeden önce kontrol ekranı: başlık, tutar, tarih, kategori düzenlenebilir; ürün listesi, kalem toplamı uyarısı
   - **Mükerrer fiş uyarısı** (aynı gün, aynı tutar, benzer mağaza)
 - **Elle ekleme**: kredi, fatura, nakit harcama vb. Daha önce girilen başlıklar öneri olarak çıkar (kategorisiyle birlikte)
+- **Hesaplar ve bakiye**: Garanti, Ziraat, nakit, kredi kartı gibi hesaplar tanımlayın. Harcama kaydederken hesabı seçin, tutar bakiyeden düşsün. Ana sayfada toplam bakiye ve hesap bazlı bakiyeler görünür
+- **Gelir ekleme**: maaş, ek gelir, prim... Hesaba eklenince bakiye artar
+- **Hesaplar arası transfer**: ör. bankadan nakit çekme; toplam bakiye değişmez
+- **Bakiye düzeltme**: gerçek bakiyeyi yazın, fark başlangıç bakiyesine işlenir
 - **Düzenli ödemeler**: kredi taksidi, kira, faturalar. Ödeme günü yaklaşınca ana sayfada görünür, tek dokunuşla "Ödendi" → gider olarak eklenir
 - **Raporlar**: kategori dağılımı, son 6 ay grafiği, en çok harcanan yerler, günlük ortalama
 - **Aylık bütçe** ve ana sayfada kalan bütçe göstergesi
@@ -58,10 +62,13 @@ APK boyutunu küçük tutmak için `app.json` → `expo-build-properties` ayarla
 ```
 src/
   app/                 Ekranlar (Expo Router)
-    (tabs)/            Ana Sayfa, Giderler, Raporlar, Ayarlar
+    (tabs)/            Ana Sayfa, Giderler, Hesaplar, Raporlar, Ayarlar
     scan.tsx           Fiş tarama
     review.tsx         Okunan fişleri kontrol & kaydet
     expense/           Gider ekle / detay / düzenle
+    account/           Hesap ekle / detay / düzenle
+    income/            Gelir ekle / düzenle
+    transfer/          Hesaplar arası transfer
     recurring.tsx      Düzenli ödemeler
     onboarding.tsx     İlk açılışta isim sorma
   components/          Ortak arayüz bileşenleri

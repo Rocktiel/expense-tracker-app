@@ -29,6 +29,7 @@ export default function NewExpense() {
             note: values.note,
             startMonth,
             totalMonths: repeat.totalMonths ?? undefined,
+            accountId: values.accountId,
             lastPaidMonth: paidThisMonth ? startMonth : undefined,
           });
           if (paidThisMonth) recurringId = item.id;
