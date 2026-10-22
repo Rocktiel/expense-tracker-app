@@ -28,6 +28,8 @@ interface AppState {
   userName: string;
   monthlyBudget: number | null;
   geminiModel: string;
+  /** Ana sayfa ve hesaplar ekranındaki bakiyeler gizli mi? Tercih kalıcıdır. */
+  balanceHidden: boolean;
   accounts: Account[];
   incomes: Income[];
   transfers: Transfer[];
@@ -39,6 +41,8 @@ interface AppState {
   setUserName: (name: string) => void;
   setMonthlyBudget: (value: number | null) => void;
   setGeminiModel: (model: string) => void;
+  setBalanceHidden: (hidden: boolean) => void;
+  toggleBalanceHidden: () => void;
 
   addAccount: (input: Omit<Account, 'id' | 'createdAt'>) => Account;
   updateAccount: (id: string, patch: Partial<Omit<Account, 'id' | 'createdAt'>>) => void;
@@ -87,6 +91,7 @@ export const useAppStore = create<AppState>()(
       userName: '',
       monthlyBudget: null,
       geminiModel: DEFAULT_MODEL,
+      balanceHidden: false,
       accounts: [],
       incomes: [],
       transfers: [],
@@ -97,6 +102,8 @@ export const useAppStore = create<AppState>()(
       setUserName: (userName) => set({ userName: userName.trim() }),
       setMonthlyBudget: (monthlyBudget) => set({ monthlyBudget }),
       setGeminiModel: (geminiModel) => set({ geminiModel }),
+      setBalanceHidden: (balanceHidden) => set({ balanceHidden }),
+      toggleBalanceHidden: () => set((s) => ({ balanceHidden: !s.balanceHidden })),
 
       addAccount: (input) => {
         const account: Account = { ...input, id: newId(), createdAt: Date.now() };
@@ -266,6 +273,7 @@ export const useAppStore = create<AppState>()(
           userName: '',
           monthlyBudget: null,
           geminiModel: DEFAULT_MODEL,
+          balanceHidden: false,
           accounts: [],
           incomes: [],
           transfers: [],
@@ -283,6 +291,7 @@ export const useAppStore = create<AppState>()(
         userName: s.userName,
         monthlyBudget: s.monthlyBudget,
         geminiModel: s.geminiModel,
+        balanceHidden: s.balanceHidden,
         accounts: s.accounts,
         incomes: s.incomes,
         transfers: s.transfers,

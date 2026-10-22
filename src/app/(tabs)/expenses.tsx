@@ -122,7 +122,7 @@ export default function Expenses() {
         stickySectionHeadersEnabled={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 32, paddingHorizontal: 16 }}
+        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 96, paddingHorizontal: 16 }}
         ListHeaderComponent={header}
         renderSectionHeader={({ section }) => (
           <View className="mb-2 mt-4 flex-row items-center justify-between px-1">

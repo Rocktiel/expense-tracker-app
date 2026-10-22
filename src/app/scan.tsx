@@ -9,7 +9,7 @@ import { Button, FieldLabel, InfoBanner, Screen } from '@/components/ui';
 import { getApiKey } from '@/lib/apiKey';
 import { readBase64 } from '@/lib/files';
 import { analyzeReceipts, GeminiError, type ScanMode, type ScanPart } from '@/lib/gemini';
-import { prepareImage } from '@/lib/images';
+import { prepareImage, uriToCompressedScanPart } from '@/lib/images';
 import { COLORS } from '@/lib/theme';
 import { useAppStore } from '@/store/useAppStore';
 import { useScanStore, type ScanFile } from '@/store/useScanStore';
@@ -186,8 +186,14 @@ export default function Scan() {
     try {
       const parts: ScanPart[] = [];
       for (const f of files) {
-        if (f.kind === 'pdf') parts.push({ base64: await readBase64(f.uri), mimeType: 'application/pdf' });
-        else if (f.base64) parts.push({ base64: f.base64, mimeType: 'image/jpeg' });
+        if (f.kind === 'pdf') {
+          parts.push({ base64: await readBase64(f.uri), mimeType: 'application/pdf' });
+        } else if (f.base64) {
+          // Fotoğraf eklenirken 1200 px / %75 olarak hazırlandı; doğrudan gönderiyoruz.
+          parts.push({ base64: f.base64, mimeType: 'image/jpeg' });
+        } else {
+          parts.push(await uriToCompressedScanPart(f.uri));
+        }
       }
       const receipts = await analyzeReceipts({ apiKey, model, files: parts, mode });
       if (!receipts.length) {

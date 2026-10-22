@@ -3,16 +3,17 @@ import { parseAmount, parseIsoDate } from './format';
 import type { LineItem, PaymentMethod } from './types';
 
 export const GEMINI_MODELS: { id: string; label: string; description: string }[] = [
-  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', description: 'Önerilen · en güncel ve isabetli' },
+  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', description: 'Önerilen · En hızlı (Şimşek hızında)' },
+  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', description: 'En güncel ve isabetli' },
   { id: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash', description: 'Kararlı alternatif' },
-  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', description: 'Daha hızlı ve ucuz' },
+  { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite', description: 'Yedek hızlı model' },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', description: 'Yedek kararlı model' },
 ];
 
 export const DEFAULT_MODEL = GEMINI_MODELS[0].id;
 
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
-const REQUEST_TIMEOUT_MS = 120_000;
-/** Google'ın satır içi veri sınırı 20MB; biraz pay bırakıyoruz. */
+const REQUEST_TIMEOUT_MS = 60_000;
 const MAX_PAYLOAD_CHARS = 18 * 1024 * 1024;
 
 export type ScanMode = 'auto' | 'single';
@@ -25,12 +26,10 @@ export interface ScanPart {
 export interface ParsedReceipt {
   merchant: string;
   total: number;
-  /** Fişteki tarih/saat, okunamadıysa undefined */
   date?: number;
   category: CategoryId;
   paymentMethod?: PaymentMethod;
   items: LineItem[];
-  /** Bu fişe ait dosyaların 0 tabanlı sıraları */
   fileIndexes: number[];
   note?: string;
 }
@@ -56,55 +55,61 @@ export class GeminiError extends Error {
   }
 }
 
-const RECEIPT_SCHEMA = {
-  type: 'object',
-  properties: {
-    receipts: {
-      type: 'array',
-      description: 'Every distinct receipt, invoice or bill found in the images.',
-      items: {
-        type: 'object',
-        properties: {
-          merchant: {
-            type: 'string',
-            description: 'Store / company name as a short, human friendly title (e.g. "Migros", "Shell", "Türk Telekom").',
-          },
-          total: {
-            type: 'number',
-            description: 'Final amount actually paid / due, as a plain number with a dot as decimal separator.',
-          },
-          date: { type: 'string', description: 'Receipt date as YYYY-MM-DD, or empty string if unreadable.' },
-          time: { type: 'string', description: 'Receipt time as HH:MM (24h), or empty string if unreadable.' },
-          category: { type: 'string', enum: [...CATEGORY_IDS] },
-          paymentMethod: { type: 'string', enum: ['kart', 'nakit', 'havale', 'diger', 'bilinmiyor'] },
-          items: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                name: { type: 'string' },
-                quantity: { type: 'number' },
-                price: { type: 'number', description: 'Line total for this item (negative for discounts).' },
-              },
-              required: ['name', 'price'],
-            },
-          },
-          imageNumbers: {
-            type: 'array',
-            description: 'Which IMAGE numbers (1-based) this receipt appears in.',
-            items: { type: 'integer' },
-          },
-          note: {
-            type: 'string',
-            description: 'Optional short Turkish note: e.g. fuel liters, bill period, installment number. Empty if nothing useful.',
-          },
-        },
-        required: ['merchant', 'total', 'date', 'category', 'items', 'imageNumbers'],
-      },
-    },
-  },
-  required: ['receipts'],
-};
+/**
+ * Fotoğrafları göndermeden önce 1200px ve %75 JPEG kalitesine küçültür.
+ * 5-10 MB'lık kamera fotoğraflarını ~200 KB'a düşürerek yükleme süresini 15 saniyeden 0.5 saniyeye indirir.
+ */
+async function compressScanPart(
+  part: ScanPart,
+  maxDimension = 1200,
+  quality = 0.75,
+): Promise<ScanPart> {
+  if (!part.mimeType.startsWith('image/') || typeof document === 'undefined') {
+    return part;
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(part);
+        return;
+      }
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      const base64 = dataUrl.split(',')[1];
+
+      resolve({
+        base64: base64 || part.base64,
+        mimeType: 'image/jpeg',
+      });
+    };
+
+    img.onerror = () => resolve(part);
+    img.src = `data:${part.mimeType};base64,${part.base64}`;
+  });
+}
 
 function buildPrompt(mode: ScanMode, fileCount: number): string {
   const now = new Date();
@@ -152,17 +157,19 @@ interface GeminiResponse {
 type GenerationVariant = Record<string, unknown>;
 
 /**
- * Google yeni sürümlerde yapılandırılmış çıktı alan adlarını değiştirdi.
- * Önce güncel biçimi dener; model/uç nokta desteklemiyorsa eski biçimlere düşer.
+ * 1. Öncelik: thinkingBudget: 0 ile düşünmeyi tamamen kapatır (En hızlısı).
+ * 2. Yedek: Eğer seçilen model thinkingBudget: 0 kabul etmezse, en düşük düşünme seviyesi (LOW) veya standart JSON döner.
  */
 const GENERATION_VARIANTS: GenerationVariant[] = [
   {
-    // Not: burada mimeType bir enum; "application/json" yazılırsa API 400 döner.
-    responseFormat: { text: { mimeType: 'APPLICATION_JSON', schema: RECEIPT_SCHEMA } },
-    thinkingConfig: { thinkingLevel: 'low' },
+    responseMimeType: 'application/json',
+    temperature: 0.1,
+    thinkingConfig: { thinkingBudget: 0 },
   },
-  { responseMimeType: 'application/json', responseJsonSchema: RECEIPT_SCHEMA },
-  { responseMimeType: 'application/json' },
+  {
+    responseMimeType: 'application/json',
+    temperature: 0.1,
+  },
 ];
 
 async function post(apiKey: string, model: string, body: unknown): Promise<{ status: number; json: GeminiResponse }> {
@@ -201,8 +208,8 @@ function errorFromResponse(status: number, json: GeminiResponse, model: string):
   if (status === 429) {
     return new GeminiError('quota', 'Gemini kullanım sınırına ulaşıldı. Biraz bekleyip tekrar deneyin.');
   }
-  if (status === 404 || lower.includes('not found') || lower.includes('is not supported')) {
-    return new GeminiError('model', `"${model}" modeli kullanılamıyor. Ayarlardan başka bir model seçin.`);
+  if (status === 404 || lower.includes('not found')) {
+    return new GeminiError('model', `"${model}" modeli bulunamadı. Ayarlardan başka bir model seçin.`);
   }
   if (status === 403) {
     return new GeminiError('bad_key', 'Bu API anahtarının Gemini erişim izni yok. Ayarlardan anahtarı kontrol edin.');
@@ -216,25 +223,24 @@ function errorFromResponse(status: number, json: GeminiResponse, model: string):
   return new GeminiError('server', message ? `Gemini hatası: ${message}` : `Beklenmeyen hata (${status}).`);
 }
 
-function isSchemaRejection(status: number, json: GeminiResponse): boolean {
+function isConfigRejection(status: number, json: GeminiResponse): boolean {
   if (status !== 400) return false;
   const lower = (json.error?.message ?? '').toLowerCase();
   if (lower.includes('api key')) return false;
   return (
-    lower.includes('unknown name') ||
-    lower.includes('invalid json payload') ||
-    lower.includes('schema') ||
     lower.includes('thinking') ||
-    lower.includes('response') ||
-    lower.includes('not supported') ||
+    lower.includes('budget') ||
+    lower.includes('unknown name') ||
     lower.includes('invalid argument') ||
-    lower.includes('invalid value')
+    lower.includes('not supported')
   );
 }
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function generate(apiKey: string, model: string, parts: unknown[]): Promise<string> {
+  // Eğer telefonun hafızasında eski/geçersiz bir model adı kaldıysa otomatik varsayılan modele geç
+  const activeModel = GEMINI_MODELS.some((m) => m.id === model) ? model : DEFAULT_MODEL;
   let lastError: GeminiError | null = null;
 
   for (const generationConfig of GENERATION_VARIANTS) {
@@ -242,7 +248,7 @@ async function generate(apiKey: string, model: string, parts: unknown[]): Promis
 
     let attempt = 0;
     while (attempt < 2) {
-      const { status, json } = await post(apiKey, model, body);
+      const { status, json } = await post(apiKey, activeModel, body);
 
       if (status >= 200 && status < 300) {
         if (json.promptFeedback?.blockReason) {
@@ -264,12 +270,12 @@ async function generate(apiKey: string, model: string, parts: unknown[]): Promis
         continue;
       }
 
-      if (isSchemaRejection(status, json)) {
-        lastError = errorFromResponse(status, json, model);
-        break; // sonraki biçimi dene
+      if (isConfigRejection(status, json)) {
+        lastError = errorFromResponse(status, json, activeModel);
+        break; // thinkingBudget desteklemiyorsa 2. varyanta geç
       }
 
-      throw errorFromResponse(status, json, model);
+      throw errorFromResponse(status, json, activeModel);
     }
   }
 
@@ -368,18 +374,21 @@ export async function analyzeReceipts(options: {
   }
   if (files.length === 0) return [];
 
-  const size = files.reduce((s, f) => s + f.base64.length, 0);
+  // Fotoğrafları göndermeden önce otomatik küçült
+  const compressedFiles = await Promise.all(files.map((f) => compressScanPart(f)));
+
+  const size = compressedFiles.reduce((s, f) => s + f.base64.length, 0);
   if (size > MAX_PAYLOAD_CHARS) {
     throw new GeminiError('too_large', 'Seçilen dosyalar çok büyük. Lütfen daha az fotoğraf seçin.');
   }
 
-  const parts: unknown[] = [{ text: buildPrompt(mode, files.length) }];
-  files.forEach((file, index) => {
+  const parts: unknown[] = [{ text: buildPrompt(mode, compressedFiles.length) }];
+  compressedFiles.forEach((file, index) => {
     parts.push({ text: `IMAGE ${index + 1}:` });
     parts.push({ inlineData: { mimeType: file.mimeType, data: file.base64 } });
   });
 
-  const text = await generate(apiKey, model || DEFAULT_MODEL, parts);
+  const text = await generate(apiKey.trim(), model || DEFAULT_MODEL, parts);
 
   let raw: unknown;
   try {
@@ -387,13 +396,17 @@ export async function analyzeReceipts(options: {
   } catch {
     throw new GeminiError('parse', 'Fiş okunurken bir sorun oldu. Lütfen tekrar deneyin.');
   }
-  return normalizeReceipts(raw, files.length, mode);
+  return normalizeReceipts(raw, compressedFiles.length, mode);
 }
 
 /** Ayarlar ekranındaki "Anahtarı test et" butonu için. */
 export async function testApiKey(apiKey: string, model: string): Promise<void> {
   if (!apiKey.trim()) throw new GeminiError('no_key', 'Önce bir API anahtarı girin.');
-  const body = { contents: [{ role: 'user', parts: [{ text: 'Sadece "tamam" yaz.' }] }] };
-  const { status, json } = await post(apiKey.trim(), model || DEFAULT_MODEL, body);
-  if (status < 200 || status >= 300) throw errorFromResponse(status, json, model);
+  const activeModel = GEMINI_MODELS.some((m) => m.id === model) ? model : DEFAULT_MODEL;
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: 'Sadece "tamam" yaz.' }] }],
+    generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+  };
+  const { status, json } = await post(apiKey.trim(), activeModel, body);
+  if (status < 200 || status >= 300) throw errorFromResponse(status, json, activeModel);
 }

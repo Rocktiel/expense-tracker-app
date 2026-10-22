@@ -16,6 +16,8 @@ export default function Accounts() {
   const incomes = useAppStore((s) => s.incomes);
   const transfers = useAppStore((s) => s.transfers);
   const defaultAccountId = useAppStore((s) => s.defaultAccountId);
+  const balanceHidden = useAppStore((s) => s.balanceHidden);
+  const toggleBalanceHidden = useAppStore((s) => s.toggleBalanceHidden);
 
   const now = useNow();
   const month = monthKey(now);
@@ -34,19 +36,40 @@ export default function Accounts() {
       {accounts.length ? (
         <>
           <Card className="mb-4 p-5">
-            <Text className="text-base font-semibold text-muted">Toplam bakiye</Text>
+            <View className="flex-row items-center">
+              <Text className="text-base font-semibold text-muted">Toplam bakiye</Text>
+              <Pressable
+                onPress={toggleBalanceHidden}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={balanceHidden ? 'Bakiyeyi göster' : 'Bakiyeyi gizle'}
+                className="ml-2 h-7 w-7 items-center justify-center rounded-full active:opacity-60"
+              >
+                <Ionicons
+                  name={balanceHidden ? 'eye-off-outline' : 'eye-outline'}
+                  size={18}
+                  color={COLORS.muted}
+                />
+              </Pressable>
+            </View>
             <Text
-              className={`mt-1 text-4xl font-bold ${total < 0 ? 'text-danger' : 'text-ink'}`}
+              className={`mt-1 text-4xl font-bold ${!balanceHidden && total < 0 ? 'text-danger' : 'text-ink'}`}
               adjustsFontSizeToFit
               numberOfLines={1}
             >
-              {formatMoney(total)}
+              {balanceHidden ? '••••••' : formatMoney(total)}
             </Text>
             <Text className="mt-2 text-base text-muted">
-              Bu ay{' '}
-              <Text className="font-semibold text-primary">+{formatMoney(monthIn, { decimals: false })}</Text>
-              {' · '}
-              <Text className="font-semibold text-ink">-{formatMoney(monthOut, { decimals: false })}</Text>
+              {balanceHidden ? (
+                'Bu ay ••••••'
+              ) : (
+                <>
+                  Bu ay{' '}
+                  <Text className="font-semibold text-primary">+{formatMoney(monthIn, { decimals: false })}</Text>
+                  {' · '}
+                  <Text className="font-semibold text-ink">-{formatMoney(monthOut, { decimals: false })}</Text>
+                </>
+              )}
             </Text>
           </Card>
 
@@ -97,7 +120,7 @@ export default function Accounts() {
                       {info.label}
                       {account.note ? ` · ${account.note}` : ''}
                     </Text>
-                    {mi || mo ? (
+                    {!balanceHidden && (mi || mo) ? (
                       <Text className="mt-0.5 text-sm text-faint" numberOfLines={1}>
                         Bu ay {mi ? `+${formatMoney(mi, { decimals: false })}` : ''}
                         {mi && mo ? ' · ' : ''}
@@ -107,10 +130,10 @@ export default function Accounts() {
                   </View>
                   <View className="ml-2 items-end">
                     <Text
-                      className={`text-lg font-bold ${balance < 0 ? 'text-danger' : 'text-ink'}`}
+                      className={`text-lg font-bold ${!balanceHidden && balance < 0 ? 'text-danger' : 'text-ink'}`}
                       numberOfLines={1}
                     >
-                      {formatMoney(balance)}
+                      {balanceHidden ? '••••' : formatMoney(balance)}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={20} color={COLORS.faint} style={{ marginLeft: 4 }} />

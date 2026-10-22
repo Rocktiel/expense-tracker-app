@@ -13,7 +13,7 @@ Kişisel gider takip uygulaması. Fişin fotoğrafını çekin, Gemini yapay zek
   - Kaydetmeden önce kontrol ekranı: başlık, tutar, tarih, kategori düzenlenebilir; ürün listesi, kalem toplamı uyarısı
   - **Mükerrer fiş uyarısı** (aynı gün, aynı tutar, benzer mağaza)
 - **Elle ekleme**: kredi, fatura, nakit harcama vb. Daha önce girilen başlıklar öneri olarak çıkar (kategorisiyle birlikte)
-- **Hesaplar ve bakiye**: Garanti, Ziraat, nakit, kredi kartı gibi hesaplar tanımlayın. Harcama kaydederken hesabı seçin, tutar bakiyeden düşsün. Ana sayfada toplam bakiye ve hesap bazlı bakiyeler görünür
+- **Hesaplar ve bakiye**: Garanti, Ziraat, nakit, kredi kartı gibi hesaplar tanımlayın. Harcama kaydederken hesabı seçin, tutar bakiyeden düşsün. Ana sayfada toplam bakiye ve hesap bazlı bakiyeler görünür; göz simgesiyle bakiyeleri gizleyip gösterebilirsiniz (tercih hatırlanır)
 - **Gelir ekleme**: maaş, ek gelir, prim... Hesaba eklenince bakiye artar
 - **Hesaplar arası transfer**: ör. bankadan nakit çekme; toplam bakiye değişmez
 - **Bakiye düzeltme**: gerçek bakiyeyi yazın, fark başlangıç bakiyesine işlenir

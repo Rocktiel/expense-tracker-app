@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { router, useSegments } from 'expo-router';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
@@ -66,6 +66,9 @@ export function AppHeader({ title, onBack }: { title: string; onBack?: () => voi
 
 export function Screen({ children, safeTop = false, title, onBack, scroll = true, footer, keyboard = false }: ScreenProps) {
   const insets = useSafeAreaInsets();
+  // Sekme ekranlarında tab bar yüzen bir ada olduğu için içerik altına ek boşluk bırakılır
+  const insideTabs = useSegments()[0] === '(tabs)';
+  const tabBarSpace = insideTabs ? 64 : 0;
   const topPadding = title ? 8 : safeTop ? insets.top + 12 : 16;
   const content = scroll ? (
     <ScrollView
@@ -73,7 +76,7 @@ export function Screen({ children, safeTop = false, title, onBack, scroll = true
       contentContainerStyle={{
         paddingHorizontal: 16,
         paddingTop: topPadding,
-        paddingBottom: footer ? 24 : insets.bottom + 32,
+        paddingBottom: footer ? 24 : insets.bottom + 32 + tabBarSpace,
       }}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"

@@ -8,9 +8,11 @@ import type { IconName } from '@/lib/categories';
 import { COLORS } from '@/lib/theme';
 import { useAppStore } from '@/store/useAppStore';
 
+const TAB_BAR_HEIGHT = 58;
+
 function tabIcon(active: IconName, inactive: IconName) {
   return function TabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
-    return <Ionicons name={focused ? active : inactive} size={26} color={color as string} />;
+    return <Ionicons name={focused ? active : inactive} size={25} color={color as string} />;
   };
 }
 
@@ -25,15 +27,30 @@ export default function TabsLayout() {
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
+        tabBarShowLabel: false,
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.muted,
+        // Yüzen ada: içerik tab bar'ın altından geçer, ekranlar alt boşluğu kendisi bırakır
         tabBarStyle: {
+          position: 'absolute',
+          // Kütüphane tab bar'ı `start`/`end: 0` ile kenarlara yapıştırıyor; bu yüzden
+          // left/right yerine mantıksal start/end kullanıyoruz.
+          start: 30,
+          end: 30,
+          bottom: Math.max(insets.bottom, 20) + 6,
+          height: TAB_BAR_HEIGHT,
+          paddingTop: 8,
+          paddingBottom: 0,
+          borderRadius: TAB_BAR_HEIGHT / 2,
+          borderWidth: 1,
+          borderColor: COLORS.line,
           backgroundColor: COLORS.surface,
-          borderTopColor: COLORS.line,
-          height: 64 + insets.bottom,
-          paddingTop: 6,
+          elevation: 16,
+          shadowColor: '#000000',
+          shadowOpacity: 0.5,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 10 },
         },
-        tabBarLabelStyle: { fontSize: 13, fontWeight: '600' },
         sceneStyle: { backgroundColor: COLORS.bg },
       }}
     >
